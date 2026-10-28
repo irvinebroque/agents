@@ -4,7 +4,7 @@ description: Run Nanocode on Cloudflare Workers with its own Durable Object host
 pcx_content_type: reference
 ---
 
-[Nanocode](https://github.com/gakonst/nanocode) is a Rust agent runtime with Codex and Claude backends. Its TypeScript package runs the engine as [WebAssembly](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) inside a [Durable Object](https://developers.cloudflare.com/durable-objects/).
+[Nanocode](https://github.com/gakonst/nanocode) is a Rust agent runtime that implements Codex and Claude Code prompt and tool conventions. Its TypeScript package runs the engine as [WebAssembly](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) inside a [Durable Object](https://developers.cloudflare.com/durable-objects/).
 
 Nanocode provides its own Cloudflare host. It does not require Agents SDK, and there is no `agents/harness/nanocode` export.
 
@@ -36,7 +36,7 @@ Nanocode handles these parts of the deployment:
 
 ## Submit a turn
 
-After deploying the host, call its session API. This example uses the Nanocode Codex backend with Workers AI model `glm-5.3` through `aiGateway()`.
+After deploying the host, call its session API. The `provider` field selects Nanocode's harness implementation. This example uses `provider: "codex"` with Workers AI model `glm-5.3` through `aiGateway()`.
 
 Configure the host with the `AI` binding, `AI_GATEWAY_ID`, and `WORKERS_AI_ACCOUNT_ID`. Run this helper in your backend, passing the deployment origin and its configured bearer token:
 
