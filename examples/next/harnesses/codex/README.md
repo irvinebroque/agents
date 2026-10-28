@@ -13,7 +13,12 @@ The example composes:
 - `WebSockets` to serve those events to the browser;
 - a `@cloudflare/computer` Workspace for durable files;
 - AI SDK `LanguageModelV4` for model calls;
-- `workers-ai-provider` for Kimi K2.7 Code through Workers AI and AI Gateway.
+- `createAI` from `agents/models/ai-sdk` for Kimi K2.7 Code through Workers AI
+  and AI Gateway.
+
+`CodexHarness` is local to this example, not a published `agents/harness/codex`
+export. Its driver uses framework-internal Tasks APIs, so keep it aligned with
+the Agents SDK version in this repository.
 
 The Wasm kernel is a cursor over one turn: which effect comes next and which
 tool calls are pending. Everything with size lives in the SDK's durable
@@ -28,9 +33,11 @@ The harness accepts a `LanguageModelV4` directly. It does not parse Workers AI
 or OpenAI response envelopes.
 
 ```ts
-const model = createWorkersAI({
+import { createAI } from "agents/models/ai-sdk";
+
+const model = createAI({
   binding: this.env.AI,
-  gateway: { id: "default" }
+  id: "default"
 })("@cf/moonshotai/kimi-k2.7-code");
 
 readonly codex = new CodexHarness({
@@ -47,13 +54,23 @@ parts back to Codex records. It preserves every tool call in a model response,
 executes the batch sequentially with one durable effect per call, and starts
 the next model round only after the complete batch settles.
 
+`createAI` replaces the deprecated `workers-ai-provider`. See the
+[model provider documentation](https://developers.cloudflare.com/agents/models/ai-sdk/)
+for model IDs and gateway options. The Codex adapter supports text, reasoning,
+and function tools; it does not support every stream part a model can return,
+such as files, provider-executed tools, or tool approval requests.
+
 ## Run locally
 
-Install Node 24+, pnpm, and the pinned Rust toolchain with the Wasm target:
+Install Node 24+, pnpm, and rustup. From the repository root, install the
+dependencies and build the local SDK, then install the pinned Rust toolchain
+with the Wasm target:
 
 ```sh
-rustup toolchain install 1.95.0 --target wasm32-unknown-unknown
 pnpm install
+pnpm exec nx run agents:build
+cd examples/next/harnesses/codex
+rustup toolchain install 1.95.0 --target wasm32-unknown-unknown
 ```
 
 Start the Vite app. It builds the Wasm kernel first. The Workers AI binding is
@@ -92,16 +109,28 @@ compacts the branch once its estimated tokens pass a threshold, using the
 same model to summarise. The budget and the compaction policy are
 `CodexHarness` options.
 
-## Stress test
+## Tests
+
+Run the model-adapter regression tests and Rust kernel tests:
+
+```sh
+pnpm test
+rustup run 1.95.0 cargo test --manifest-path wasm-kernel/Cargo.toml
+```
 
 `src/stress` hosts the same composition with a synthetic model, so the kernel,
 Tasks, Streams, and SQLite paths run without Workers AI.
 
 ```sh
+pnpm run build:kernel
 pnpm run stress:dev            # wrangler dev on :8790, inspector on :9250
 pnpm run stress                # or: pnpm run stress deep big-tools concurrent
 pnpm run heap snapshot         # V8 heap usage and top holders over CDP
 ```
+
+The 200-round scenario verifies the 128-round limit by expecting a failed
+operation. Unexpected failures or invalid storage statistics make the stress
+command exit with a nonzero status.
 
 ## Deploy
 
@@ -124,4 +153,4 @@ The kernel follows `openai/codex` commit
 
 Codex is Apache-2.0. See [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).
 The target design is documented in
-[`design/rfc-codex-harness-capability.md`](../../../design/rfc-codex-harness-capability.md).
+[`design/rfc-codex-harness-capability.md`](../../../../design/rfc-codex-harness-capability.md).

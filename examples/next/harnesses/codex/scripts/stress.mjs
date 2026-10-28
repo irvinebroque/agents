@@ -5,6 +5,8 @@
 //
 // Scenarios: baseline, deep, wide, big-tools, huge-prompt, many-ops, concurrent, all
 
+import assert from "node:assert/strict";
+
 const args = process.argv.slice(2);
 const baseUrl = (
   args.find((a) => a.startsWith("http")) ?? "http://127.0.0.1:8790"
@@ -13,7 +15,7 @@ const selected = args.filter((a) => !a.startsWith("http"));
 const wanted =
   selected.length === 0 || selected.includes("all") ? null : new Set(selected);
 
-async function run(object, scenario, promptBytes = 64) {
+async function run(object, scenario, promptBytes = 64, expectedError) {
   const response = await fetch(
     `${baseUrl}/run?object=${encodeURIComponent(object)}`,
     {
@@ -23,25 +25,44 @@ async function run(object, scenario, promptBytes = 64) {
     }
   );
   const body = await response.json();
-  if (!response.ok) {
-    // A rejected submission is a result too: report it and keep going.
-    return {
-      status: "rejected",
-      wallMs: 0,
-      kernelMs: 0,
-      transitions: 0,
-      checkpointBytes: 0,
-      events: 0,
-      error: body.error
-    };
-  }
+  assert.ok(response.ok, `${object}: HTTP ${response.status}: ${body.error}`);
+  assert.equal(
+    body.status,
+    expectedError ? "failed" : "completed",
+    `${object}: ${body.error ?? "unexpected operation status"}`
+  );
+  if (expectedError) assert.match(body.error, expectedError);
   return body;
 }
 
 async function stats(object) {
-  return (
-    await fetch(`${baseUrl}/stats?object=${encodeURIComponent(object)}`)
-  ).json();
+  const response = await fetch(
+    `${baseUrl}/stats?object=${encodeURIComponent(object)}`
+  );
+  const body = await response.json();
+  assert.ok(
+    response.ok,
+    `${object}: stats HTTP ${response.status}: ${body.error}`
+  );
+  for (const field of [
+    "operations",
+    "checkpointBytesTotal",
+    "checkpointBytesMax",
+    "streamChunks",
+    "streamBlocks",
+    "streamBytes",
+    "sessionMessages",
+    "sessionContinuationRows",
+    "sessionBytes",
+    "databaseBytes",
+    "kernelMemoryBytes"
+  ]) {
+    assert.ok(
+      Number.isFinite(body[field]) && body[field] >= 0,
+      `Invalid ${field}`
+    );
+  }
+  return body;
 }
 
 function kb(bytes) {
@@ -57,7 +78,7 @@ function describe(label, result) {
 
 function describeStats(label, s) {
   console.log(
-    `  ${label.padEnd(28)} ops ${s.operations}  checkpoints ${kb(s.checkpointBytesTotal)} (max ${kb(s.checkpointBytesMax)})  stream chunks ${s.streamChunks} / ${kb(s.streamBytes)}  session msgs ${s.sessionMessages} (+${s.sessionContinuationRows} continuation rows) / ${kb(s.sessionBytes)}  db ${kb(s.databaseBytes)}  wasm memory ${kb(s.kernelMemoryBytes)}`
+    `  ${label.padEnd(28)} ops ${s.operations}  checkpoints ${kb(s.checkpointBytesTotal)} (max ${kb(s.checkpointBytesMax)})  stream chunks ${s.streamChunks} in ${s.streamBlocks} blocks / ${kb(s.streamBytes)}  session msgs ${s.sessionMessages} (+${s.sessionContinuationRows} continuation rows) / ${kb(s.sessionBytes)}  db ${kb(s.databaseBytes)}  wasm memory ${kb(s.kernelMemoryBytes)}`
   );
 }
 
@@ -88,7 +109,12 @@ const scenarios = {
     );
     describe(
       "200 rounds (over round cap)",
-      await run(`deep-${stamp}`, { ...base, rounds: 200 })
+      await run(
+        `deep-${stamp}`,
+        { ...base, rounds: 200 },
+        64,
+        /exceeded 128 model rounds/
+      )
     );
   },
   async wide() {
@@ -152,6 +178,13 @@ const scenarios = {
   }
 };
 
+for (const name of selected) {
+  assert.ok(
+    name === "all" || Object.hasOwn(scenarios, name),
+    `Unknown scenario: ${name}`
+  );
+}
+
 for (const [name, fn] of Object.entries(scenarios)) {
   if (wanted && !wanted.has(name)) continue;
   console.log(`\n== ${name}`);
@@ -159,5 +192,6 @@ for (const [name, fn] of Object.entries(scenarios)) {
     await fn();
   } catch (error) {
     console.log(`  FAILED: ${error.message}`);
+    process.exitCode = 1;
   }
 }

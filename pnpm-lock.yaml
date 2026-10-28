@@ -2224,9 +2224,6 @@ importers:
       streamdown:
         specifier: ^2.5.0
         version: 2.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)
-      workers-ai-provider:
-        specifier: ^4.0.0
-        version: 4.0.0(@ai-sdk/anthropic@4.0.10(zod@4.6.7))(@ai-sdk/google@4.0.10(zod@4.6.7))(@ai-sdk/openai@4.0.9(zod@4.6.7))(@ai-sdk/provider@4.0.2)(ai@7.0.18(zod@4.6.7))
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: 1.62.3
@@ -2255,6 +2252,9 @@ importers:
       vite:
         specifier: ^8.1.6
         version: 8.1.6(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/browser-playwright@4.1.11)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@26.4.0)(typescript@6.0.3))(vite@8.1.6(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
       wrangler:
         specifier: ^4.145.0
         version: 4.145.0(@cloudflare/workers-types@5.20261014.1)(@types/node@26.4.0)

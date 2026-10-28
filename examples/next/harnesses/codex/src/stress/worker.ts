@@ -30,6 +30,7 @@ export type StressStats = {
   readonly checkpointBytesTotal: number;
   readonly checkpointBytesMax: number;
   readonly streamChunks: number;
+  readonly streamBlocks: number;
   readonly streamBytes: number;
   readonly sessionMessages: number;
   readonly sessionContinuationRows: number;
@@ -116,8 +117,8 @@ export class StressCoder extends DurableObject<StressEnv> {
     const ops = one<{ n: number; total: number; max: number }>(
       "SELECT count(*) AS n, coalesce(sum(length(checkpoint)), 0) AS total, coalesce(max(length(checkpoint)), 0) AS max FROM cf_codex_operations"
     );
-    const chunks = one<{ n: number; total: number }>(
-      "SELECT count(*) AS n, coalesce(sum(length(chunk)), 0) AS total FROM cf_agents_stream_chunks"
+    const chunks = one<{ n: number; blocks: number; total: number }>(
+      "SELECT coalesce(sum(seq_to - seq_from), 0) AS n, count(*) AS blocks, coalesce(sum(length(CAST(body AS BLOB))), 0) AS total FROM cf_agents_stream_blocks"
     );
     const messages = one<{ n: number; total: number }>(
       "SELECT count(*) AS n, coalesce(sum(length(content)), 0) AS total FROM cf_agents_session_messages"
@@ -130,6 +131,7 @@ export class StressCoder extends DurableObject<StressEnv> {
       checkpointBytesTotal: ops.total,
       checkpointBytesMax: ops.max,
       streamChunks: chunks.n,
+      streamBlocks: chunks.blocks,
       streamBytes: chunks.total,
       sessionMessages: messages.n,
       sessionContinuationRows: continuations.n,

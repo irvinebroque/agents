@@ -2,11 +2,11 @@ import { Workspace } from "@cloudflare/computer";
 import { DurableObject } from "cloudflare:workers";
 import { routeAgentRequest } from "agents";
 import { Lifecycle } from "agents/lifecycle";
+import { createAI } from "agents/models/ai-sdk";
 import { Sessions } from "agents/sessions";
 import { Streams } from "agents/streams";
 import { Tasks } from "agents/tasks";
 import { WebSockets } from "agents/websockets";
-import { createWorkersAI } from "workers-ai-provider";
 import { CodexHarness } from "./codex-harness";
 
 const MODEL = "@cf/moonshotai/kimi-k2.7-code";
@@ -22,9 +22,9 @@ export class Coder extends DurableObject<Env> {
     streams: this.streams,
     sessions: this.sessions,
     workspace: this.workspace,
-    model: createWorkersAI({
+    model: createAI({
       binding: this.env.AI,
-      gateway: { id: "default" }
+      id: "default"
     })(MODEL)
   });
   readonly webSockets = new WebSockets(
