@@ -4,7 +4,7 @@ description: Run Nanocode on Cloudflare Workers with its own Durable Object host
 pcx_content_type: reference
 ---
 
-[Nanocode](https://github.com/gakonst/nanocode) is a Rust agent runtime with Codex and Claude backends. Its TypeScript package runs the engine as WebAssembly inside a Durable Object.
+[Nanocode](https://github.com/gakonst/nanocode) is a Rust agent runtime with Codex and Claude backends. Its TypeScript package runs the engine as [WebAssembly](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) inside a [Durable Object](https://developers.cloudflare.com/durable-objects/).
 
 Nanocode provides its own Cloudflare host. It does not require Agents SDK, and there is no `agents/harness/nanocode` export.
 
