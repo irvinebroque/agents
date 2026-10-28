@@ -9,7 +9,6 @@
     "start": "pnpm run build:kernel && vite dev",
     "deploy": "pnpm run build:kernel && vite build && wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
     "types": "wrangler types env.d.ts --include-runtime false",
     "stress:dev": "wrangler dev --config src/stress/wrangler.jsonc --port 8790 --inspector-port 9250",
     "stress": "node scripts/stress.mjs",
@@ -37,7 +36,6 @@
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
     "vite": "^8.1.6",
-    "vitest": "4.1.11",
     "wrangler": "^4.145.0",
     "ws": "^8.21.3"
   }

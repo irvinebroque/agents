@@ -9,7 +9,6 @@ import {
   Text
 } from "@cloudflare/kumo";
 import {
-  ArrowClockwiseIcon,
   CheckCircleIcon,
   CodeIcon,
   GearIcon,
@@ -450,8 +449,6 @@ function App() {
     messages,
     error,
     active,
-    recovered,
-    restart,
     submit,
     inspectMessage
   } = useCodexSession(session);
@@ -519,15 +516,6 @@ function App() {
               <Button
                 variant="ghost"
                 shape="square"
-                aria-label="Restart and verify"
-                title="Restart the Durable Object and reload durable state"
-                onClick={restart}
-                disabled={!connected}
-                icon={<ArrowClockwiseIcon size={16} />}
-              />
-              <Button
-                variant="ghost"
-                shape="square"
                 aria-label="Tools"
                 aria-expanded={toolsOpen}
                 onClick={() => setToolsOpen((open) => !open)}
@@ -548,12 +536,6 @@ function App() {
 
         <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl space-y-6 px-5 py-6">
-            {recovered && (
-              <output className="block text-sm text-kumo-subtle">
-                Reconnected after restart. Conversation and workspace reloaded
-                from durable storage.
-              </output>
-            )}
             {operations.length === 0 && (
               <div className="py-10 sm:py-16">
                 <Empty

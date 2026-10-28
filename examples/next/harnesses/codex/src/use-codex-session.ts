@@ -92,16 +92,12 @@ export function useCodexSession(session: string) {
   const restartingRef = useRef(false);
   /** Operations this connection already subscribed to; reset on every open. */
   const subscribedRef = useRef(new Set<string>());
-  /** Live tails need a fresh file snapshot when they finish, even if the
-   * operation's terminal update arrives before stream_end. */
-  const liveTailsRef = useRef(new Set<string>());
 
   const agent = useAgent({
     agent: "coder",
     name: session,
     onOpen: () => {
       subscribedRef.current.clear();
-      liveTailsRef.current.clear();
       setState((current) => ({ ...current, status: "open" }));
     },
     onClose: () => setState((current) => ({ ...current, status: "closed" })),
@@ -128,9 +124,6 @@ export function useCodexSession(session: string) {
           for (const operation of operations) {
             if (subscribedRef.current.has(operation.operationId)) continue;
             subscribedRef.current.add(operation.operationId);
-            if (isActive(operation)) {
-              liveTailsRef.current.add(operation.operationId);
-            }
             const from = stateEventsLength(operation.operationId);
             subscribeRef.current(operation.operationId, from);
           }
@@ -146,7 +139,6 @@ export function useCodexSession(session: string) {
             !subscribedRef.current.has(message.operation.operationId)
           ) {
             subscribedRef.current.add(message.operation.operationId);
-            liveTailsRef.current.add(message.operation.operationId);
             subscribeRef.current(message.operation.operationId, 0);
           }
           return;
@@ -173,7 +165,10 @@ export function useCodexSession(session: string) {
         case "stream_end": {
           // Only an operation we were tailing live needs its settled state
           // and file; a replayed closed stream ends immediately.
-          if (liveTailsRef.current.delete(message.operationId)) {
+          const operation = stateRef.current.operations.find(
+            (candidate) => candidate.operationId === message.operationId
+          );
+          if (operation && isActive(operation)) {
             sendRef.current({ type: "snapshot", id: crypto.randomUUID() });
           }
           return;
