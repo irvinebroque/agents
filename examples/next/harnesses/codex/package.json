@@ -12,7 +12,8 @@
     "types": "wrangler types env.d.ts --include-runtime false",
     "stress:dev": "wrangler dev --config src/stress/wrangler.jsonc --port 8790 --inspector-port 9250",
     "stress": "node scripts/stress.mjs",
-    "heap": "node scripts/heap.mjs"
+    "heap": "node scripts/heap.mjs",
+    "test": "rustup toolchain install 1.95.0 --profile minimal --target wasm32-unknown-unknown && RUSTC=\"$(rustup which --toolchain 1.95.0 rustc)\" rustup run 1.95.0 cargo test --manifest-path wasm-kernel/Cargo.toml && pnpm run build:kernel && node --test scripts/kernel.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/provider": "^4.0.0",

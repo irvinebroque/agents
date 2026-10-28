@@ -111,8 +111,8 @@ pnpm run deploy
 
 ## Codex source
 
-The kernel follows `openai/codex` commit
-`5e26f7621c1c470fe62350d61c9eb4d6c772a0da`, especially:
+The kernel follows [Codex 0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0),
+commit `360319d8dee62d87e2d59fc0c21805d79519cfed`, especially:
 
 - `codex-rs/codex-api/src/common.rs`
 - `codex-rs/codex-api/src/sse/responses.rs`
@@ -120,8 +120,11 @@ The kernel follows `openai/codex` commit
 - `codex-rs/tools/src/responses_api.rs`
 - `codex-rs/tools/src/tool_spec.rs`
 - `codex-rs/core/src/session/turn.rs`
+- `codex-rs/core/src/client.rs`
+- `codex-rs/core/src/context/base_instructions.rs`
 - `codex-rs/core/src/tools/parallel.rs`
 
+See [`wasm-kernel/UPSTREAM.md`](./wasm-kernel/UPSTREAM.md) for the ported subset.
 Codex is Apache-2.0. See [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).
 The target design is documented in
 [`design/rfc-codex-harness-capability.md`](../../../design/rfc-codex-harness-capability.md).
