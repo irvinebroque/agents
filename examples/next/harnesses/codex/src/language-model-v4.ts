@@ -90,7 +90,12 @@ function parseResponsesRequest(value: KernelJson): {
   if (!isRecord(value)) {
     throw new Error("Codex model action request must be an object");
   }
-  const instructions = value.instructions;
+  // Persisted model actions from the previous kernel still have an
+  // `instructions` field. Keep them replayable across the source update.
+  const instructions =
+    typeof value.instructions === "string"
+      ? value.instructions
+      : developerInstructions(value.input);
   const tools = value.tools;
   if (typeof instructions !== "string" || !Array.isArray(tools)) {
     throw new Error(
@@ -98,6 +103,38 @@ function parseResponsesRequest(value: KernelJson): {
     );
   }
   return { instructions, tools };
+}
+
+function developerInstructions(input: KernelJson | undefined): string {
+  if (!Array.isArray(input)) {
+    throw new Error("Codex model action request must include input messages");
+  }
+  return input
+    .map((item) => {
+      if (
+        !isRecord(item) ||
+        item.type !== "message" ||
+        item.role !== "developer" ||
+        !Array.isArray(item.content)
+      ) {
+        throw new Error(
+          "Codex model action input must contain developer messages"
+        );
+      }
+      return item.content
+        .map((part) => {
+          if (
+            !isRecord(part) ||
+            part.type !== "input_text" ||
+            typeof part.text !== "string"
+          ) {
+            throw new Error("Codex developer message must contain input_text");
+          }
+          return part.text;
+        })
+        .join("\n");
+    })
+    .join("\n");
 }
 
 // ── Sessions → LanguageModelV4 prompt ──────────────────────────────────────
