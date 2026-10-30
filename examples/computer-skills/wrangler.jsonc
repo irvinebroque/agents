@@ -9,6 +9,7 @@
     "run_worker_first": ["/agents/*"]
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       {
         "class_name": "SkillsAgent",

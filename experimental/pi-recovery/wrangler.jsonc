@@ -13,6 +13,7 @@
     }
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [{ "name": "PiAgent", "class_name": "PiAgent" }]
   },
   "migrations": [

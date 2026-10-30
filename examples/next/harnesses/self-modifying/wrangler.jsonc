@@ -13,6 +13,7 @@
     "remote": true
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       {
         "name": "SELF_MODIFYING_HARNESS",

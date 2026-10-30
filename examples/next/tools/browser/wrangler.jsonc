@@ -27,6 +27,7 @@
     }
   ],
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       {
         "name": "BrowserAgent",

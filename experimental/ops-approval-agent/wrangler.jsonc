@@ -17,6 +17,7 @@
     "remote": true
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       { "name": "OpsApprovalAgent", "class_name": "OpsApprovalAgent" }
     ]

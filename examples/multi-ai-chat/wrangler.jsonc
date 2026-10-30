@@ -8,6 +8,7 @@
     "run_worker_first": ["/agents/*"]
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       // Only `Inbox` is bound top-level. `Chat` is a facet of Inbox,
       // and `Researcher` is a nested facet of Chat; neither needs its

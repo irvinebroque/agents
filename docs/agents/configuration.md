@@ -22,6 +22,7 @@ The `wrangler.jsonc` file configures your Cloudflare Worker and its bindings. He
 
   // Durable Object bindings for agents
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       {
         "name": "MyAgent",
@@ -91,6 +92,20 @@ Each agent class needs a binding:
 ```
 
 This is useful when you want environment variable-style naming (`COUNTER_DO`) but more descriptive class names (`CounterAgent`).
+
+#### durable_objects.code_update_strategy
+
+Use deferred updates so active agents can keep running the previous version until they hibernate, for up to 300 seconds:
+
+```jsonc
+"durable_objects": {
+  "code_update_strategy": { "mode": "deferred" }
+}
+```
+
+Requires Wrangler 4.141.0 or later. Set `max_delay` in seconds to change the wait, up to 86400 seconds (24 hours). Use `{ "mode": "immediate" }` when a deployment must reset active agents immediately.
+
+Updates are best effort. Keep recovery state in durable storage and support requests from both the old and new Worker versions during a deployment. Hibernatable WebSockets can stay connected when an agent adopts new code after hibernation.
 
 #### migrations
 

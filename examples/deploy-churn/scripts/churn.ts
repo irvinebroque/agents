@@ -33,6 +33,7 @@
  *   --no-initial-deploy              skip the pre-run deploy (worker must exist)
  */
 import { spawn } from "node:child_process";
+import { deploymentOptions } from "./code-update-mode";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,6 +129,9 @@ const BASE_URL = opt(
 );
 const AGENT_PATH = opt("agent-path", "AGENT_PATH", "deploy-churn-agent");
 const SESSION = opt("session", "SESSION", "default");
+const CODE_UPDATE = deploymentOptions(
+  opt("code-update-mode", "CODE_UPDATE_MODE", "immediate")
+);
 const DEPLOYS = num("deploys", "DEPLOYS", 3);
 const DURATION = num("duration", "DURATION", 90);
 const MID_TURN_DELAY = num("mid-turn-delay", "MID_TURN_DELAY", 8);
@@ -340,9 +344,9 @@ function startConnectionMonitor(): { stop: () => void } {
 
 function runDeploy(label: string): Promise<{ versionId: string | null }> {
   return new Promise((resolve, reject) => {
-    record("deploy:start", { label });
+    record("deploy:start", { label, codeUpdateMode: CODE_UPDATE.mode });
     const startedAt = Date.now();
-    const child = spawn("npm", ["run", "deploy"], {
+    const child = spawn("npm", CODE_UPDATE.args, {
       cwd: EXAMPLE_DIR,
       stdio: ["ignore", "pipe", "pipe"],
       env: process.env
@@ -461,6 +465,7 @@ async function subSnapshot(tag: string): Promise<SubAgentStatus | null> {
 
 async function mainSubAgent(): Promise<void> {
   record("run:start", {
+    codeUpdateMode: CODE_UPDATE.mode,
     mode: "subagent",
     baseUrl: httpOrigin,
     agentWsUrl: AGENT_WS_URL,
@@ -558,6 +563,7 @@ async function mainSubAgent(): Promise<void> {
   const summary = {
     runId,
     config: {
+      codeUpdateMode: CODE_UPDATE.mode,
       mode: "subagent",
       baseUrl: httpOrigin,
       agentWsUrl: AGENT_WS_URL,
@@ -597,6 +603,7 @@ async function mainSubAgent(): Promise<void> {
 
 async function main(): Promise<void> {
   record("run:start", {
+    codeUpdateMode: CODE_UPDATE.mode,
     baseUrl: httpOrigin,
     agentWsUrl: AGENT_WS_URL,
     session: SESSION,
@@ -655,6 +662,7 @@ async function main(): Promise<void> {
   const settleDeadline = Date.now() + SETTLE * 1000;
   let lastStatus: AgentStatus | null = null;
   let selfRecovered = false;
+  let turnCompleted = false;
   let exhausted = false;
   while (Date.now() < settleDeadline) {
     await sleep(3000);
@@ -664,19 +672,20 @@ async function main(): Promise<void> {
       exhausted = true;
       break;
     }
-    // Self-recovered = a turn completed AFTER the last deploy (so it ran on
-    // fresh code) with no orphaned fiber rows left behind.
-    const completedAfterChurn = lastStatus.turns.some(
+    // Deferred updates can let the original turn finish on the old code.
+    // Only a completed continuation is evidence that recovery ran.
+    const completedAfterChurn = lastStatus.turns.find(
       (t) => t.status === "completed" && t.at > lastDeployAt
     );
     if (completedAfterChurn && !lastStatus.hasFiberRows) {
-      selfRecovered = true;
+      turnCompleted = true;
+      selfRecovered = completedAfterChurn.continuation;
       break;
     }
   }
 
   // The decisive probe from the report: is the DO itself wedged, or only the
-  // interrupted turn? A fresh user message must complete cleanly on new code.
+  // interrupted turn? A fresh user message must complete cleanly.
   const freshSentAt = Date.now();
   record("freshTurn:send");
   await startTurn("Post-churn health check: stream for 5 seconds.");
@@ -699,6 +708,7 @@ async function main(): Promise<void> {
   monitor.stop();
 
   const verdict = {
+    turnCompleted,
     selfRecovered,
     exhausted,
     doHealthyAfterChurn: freshHealthy,
@@ -715,6 +725,7 @@ async function main(): Promise<void> {
   const summary = {
     runId,
     config: {
+      codeUpdateMode: CODE_UPDATE.mode,
       baseUrl: httpOrigin,
       agentWsUrl: AGENT_WS_URL,
       session: SESSION,
@@ -738,6 +749,10 @@ async function main(): Promise<void> {
   } else if (selfRecovered) {
     console.log(
       "SELF-RECOVERED: chat recovery continued the interrupted turn after the deploy churn."
+    );
+  } else if (turnCompleted) {
+    console.log(
+      "TURN COMPLETED: the turn finished without a recovery continuation."
     );
   } else {
     console.log(

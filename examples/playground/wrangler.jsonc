@@ -9,6 +9,7 @@
     "remote": true
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       // Core demo agents
       { "name": "StateAgent", "class_name": "StateAgent" },

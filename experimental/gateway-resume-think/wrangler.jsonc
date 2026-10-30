@@ -21,6 +21,7 @@
     "MODEL": "openai/gpt-5.4"
   },
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       { "name": "GatewayResumeAgent", "class_name": "GatewayResumeAgent" }
     ]
