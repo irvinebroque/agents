@@ -20,6 +20,7 @@
 
   // Each tab has its own Durable Object agent
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       { "class_name": "VoiceChatAgent", "name": "VoiceChatAgent" },
       { "class_name": "SoundscapeAgent", "name": "SoundscapeAgent" },

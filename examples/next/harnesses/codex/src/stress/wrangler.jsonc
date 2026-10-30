@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "rules": [{ "type": "CompiledWasm", "globs": ["**/*.wasm"] }],
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [{ "name": "STRESS", "class_name": "StressCoder" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StressCoder"] }]

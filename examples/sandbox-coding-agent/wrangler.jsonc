@@ -23,6 +23,7 @@
   // ClaudeCodeAgent needs no binding — the orchestrator spawns it as a facet
   // (sub-agent), but it must still be exported from the Worker entry (server.ts).
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       { "class_name": "CodingOrchestrator", "name": "CodingOrchestrator" },
       { "class_name": "Sandbox", "name": "Sandbox" }

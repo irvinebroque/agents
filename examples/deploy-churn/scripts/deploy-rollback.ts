@@ -4,7 +4,7 @@
  * The customer reports "large rollbacks" on deploys: a whole message's worth of
  * already-completed (non-idempotent) tool calls re-running after a deploy lands
  * mid-turn. The kill/restart e2e tests can't reproduce this — only a real
- * `wrangler deploy`, which ships a new script version and resets the in-flight
+ * `wrangler deploy`, which ships a new script version and, in immediate mode, resets the in-flight
  * Durable Object, exposes it.
  *
  * This driver, over plain HTTP (no browser, no WebSocket):
@@ -40,6 +40,7 @@
  *   --no-initial-deploy        skip the pre-run deploy (worker must already exist)
  */
 import { spawn } from "node:child_process";
+import { deploymentOptions } from "./code-update-mode";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -125,6 +126,9 @@ const STEPS = num("steps", "STEPS", 24);
 // Per-tool in-flight window. Set large (e.g. 12000) so a real ~33s deploy lands
 // DURING a tool execution, exercising the code-update reset mid-tool.
 const STEP_DELAY_MS = num("delay-ms", "STEP_DELAY_MS", 0);
+const CODE_UPDATE = deploymentOptions(
+  opt("code-update-mode", "CODE_UPDATE_MODE", "immediate")
+);
 const DEPLOYS = num("deploys", "DEPLOYS", 3);
 const MID_TURN_DELAY = num("mid-turn-delay", "MID_TURN_DELAY", 6);
 const BETWEEN = num("between", "BETWEEN", 4);
@@ -219,9 +223,9 @@ async function status(tag: string): Promise<ToolStatus | null> {
 
 function runDeploy(label: string): Promise<{ versionId: string | null }> {
   return new Promise((resolve, reject) => {
-    record("deploy:start", { label });
+    record("deploy:start", { label, codeUpdateMode: CODE_UPDATE.mode });
     const startedAt = Date.now();
-    const child = spawn("npm", ["run", "deploy"], {
+    const child = spawn("npm", CODE_UPDATE.args, {
       cwd: EXAMPLE_DIR,
       stdio: ["ignore", "pipe", "pipe"],
       env: process.env
@@ -266,6 +270,7 @@ function isTerminal(s: Submission | undefined): boolean {
 
 async function main(): Promise<void> {
   record("run:start", {
+    codeUpdateMode: CODE_UPDATE.mode,
     baseUrl: BASE_URL,
     session: SESSION,
     provider: PROVIDER,
@@ -336,6 +341,7 @@ async function main(): Promise<void> {
   else classification = "ROLLBACK";
 
   const verdict = {
+    codeUpdateMode: CODE_UPDATE.mode,
     provider: PROVIDER,
     model: MODEL || "(default)",
     classification,

@@ -1,8 +1,24 @@
 # Deploy churn — durable chat recovery under real deploys
 
 A reliability harness that drives a long durable chat turn against a **deployed**
-Worker, then fires **repeated real `wrangler deploy`s mid-turn** to see how chat
-recovery behaves when a Durable Object is reset by a live code update.
+Worker, then fires **repeated real `wrangler deploy`s mid-turn** to test either recovery from an immediate code-update reset or continuity during a deferred update.
+
+## Choose the update mode
+
+```bash
+# Force resets to test recovery (the harness default):
+npm run churn -- --code-update-mode immediate --deploys 3
+npm run rollback -- --code-update-mode immediate --deploys 3
+
+# Let an active turn finish before the object adopts new code:
+npm run churn -- --code-update-mode deferred --deploys 3
+npm run rollback -- --code-update-mode deferred --deploys 3
+```
+
+Normal `npm run deploy` uses the deferred setting in `wrangler.jsonc`.
+The harness overrides it for each deploy and records `codeUpdateMode` in the timeline and summary.
+Deferred runs allow up to 300 seconds before a forced update. They can still reset;
+a completed turn alone does not prove that recovery ran. Immediate runs exercise recovery after a code-update reset.
 
 ## Why this exists
 
@@ -12,7 +28,7 @@ covers one class of eviction — same code, fresh isolate — but a **real deplo
 different**:
 
 - `wrangler deploy` ships a **new script version**.
-- A Durable Object still running the **old** version is reset with
+- In **immediate** mode, a Durable Object still running the **old** version is reset with
   `Durable Object reset because its code was updated`.
 - Storage calls on that stale isolate keep throwing for the rest of the
   invocation; **fresh code only loads on the next execution** (a new `requestId`).
@@ -87,7 +103,8 @@ Output (per run, gitignored) lands in `scripts/runs/`:
 
 The printed verdict distinguishes the two failure shapes from the report:
 
-- **SELF-RECOVERED** — a turn completed on fresh code after the churn.
+- **SELF-RECOVERED** — a recovery continuation completed after the churn.
+- **TURN COMPLETED** — the turn finished without a recovery continuation.
 - **RECOVERY EXHAUSTED** — the attempt budget was burned and the turn abandoned.
 - plus **Durable Object health after churn** — a fresh message must complete,
   proving it's the _turn_ that's orphaned, not the _DO_ that's wedged.

@@ -8,6 +8,9 @@ assets = { directory = "public" }
 [ai]
 binding = "AI"
 
+[durable_objects.code_update_strategy]
+mode = "deferred"
+
 [[durable_objects.bindings]]
 name = "HumanInTheLoop"
 class_name = "HumanInTheLoop"

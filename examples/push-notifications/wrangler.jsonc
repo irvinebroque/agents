@@ -5,6 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       {
         "name": "ReminderAgent",

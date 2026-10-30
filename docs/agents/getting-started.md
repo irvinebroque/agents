@@ -113,6 +113,7 @@ Update `wrangler.jsonc` to register the agent:
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
+    "code_update_strategy": { "mode": "deferred" },
     "bindings": [
       {
         "name": "Counter",
