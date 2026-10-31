@@ -13,7 +13,8 @@ The example composes:
 - `WebSockets` to serve those events to the browser;
 - a `@cloudflare/computer` Workspace for durable files;
 - AI SDK `LanguageModelV4` for model calls;
-- `workers-ai-provider` for Kimi K2.7 Code through Workers AI and AI Gateway.
+- `createAI` from `agents/models/ai-sdk` for Kimi K2.7 Code through Workers AI
+  and AI Gateway.
 
 The Wasm kernel is a cursor over one turn: which effect comes next and which
 tool calls are pending. Everything with size lives in the SDK's durable
@@ -28,9 +29,11 @@ The harness accepts a `LanguageModelV4` directly. It does not parse Workers AI
 or OpenAI response envelopes.
 
 ```ts
-const model = createWorkersAI({
+import { createAI } from "agents/models/ai-sdk";
+
+const model = createAI({
   binding: this.env.AI,
-  gateway: { id: "default" }
+  id: "default"
 })("@cf/moonshotai/kimi-k2.7-code");
 
 readonly codex = new CodexHarness({
