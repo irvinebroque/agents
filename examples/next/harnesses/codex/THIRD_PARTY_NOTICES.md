@@ -3,8 +3,9 @@
 ## OpenAI Codex
 
 This example adapts protocol types and turn-processing behavior from
-[openai/codex](https://github.com/openai/codex), pinned for research at commit
-`5e26f7621c1c470fe62350d61c9eb4d6c772a0da`.
+[openai/codex](https://github.com/openai/codex), version
+[0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0), pinned at commit
+`360319d8dee62d87e2d59fc0c21805d79519cfed`.
 
 Copyright OpenAI.
 

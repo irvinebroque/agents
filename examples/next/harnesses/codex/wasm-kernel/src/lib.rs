@@ -6,11 +6,14 @@
 //! items live in the host's session store, so the checkpoint stays a few
 //! hundred bytes no matter how long the conversation is.
 //! The Responses request, stream-event, response-item, and tool shapes follow
-//! openai/codex at commit 5e26f7621c1c470fe62350d61c9eb4d6c772a0da.
+//! openai/codex 0.165.0 (360319d8dee62d87e2d59fc0c21805d79519cfed).
 //!
 //! Source references:
 //! - codex-rs/codex-api/src/common.rs
 //! - codex-rs/codex-api/src/sse/responses.rs
+//! - codex-rs/core/src/client.rs
+//! - codex-rs/core/src/context/base_instructions.rs
+//! - codex-rs/core/src/session/turn.rs
 //! - codex-rs/protocol/src/models.rs
 //! - codex-rs/tools/src/responses_api.rs
 //! - codex-rs/tools/src/tool_spec.rs
@@ -181,6 +184,8 @@ struct ResponsesStreamEvent {
     #[serde(default)]
     response: Option<Value>,
     #[serde(default)]
+    error: Option<Value>,
+    #[serde(default)]
     item: Option<Value>,
     #[serde(default)]
     delta: Option<String>,
@@ -296,6 +301,16 @@ fn resolve_model(mut checkpoint: Checkpoint, frames: Vec<Value>) -> Transition {
             continue;
         };
         match frame.kind.as_str() {
+            "response.created" => {
+                if let Some(id) = frame
+                    .response
+                    .as_ref()
+                    .and_then(|response| response.get("id"))
+                    .and_then(Value::as_str)
+                {
+                    checkpoint.response_id = Some(id.to_string());
+                }
+            }
             "response.output_text.delta" => {
                 if let Some(delta) = frame.delta {
                     checkpoint.final_output.push_str(&delta);
@@ -320,28 +335,69 @@ fn resolve_model(mut checkpoint: Checkpoint, frames: Vec<Value>) -> Transition {
                     handle_output_item(&mut checkpoint, item);
                 }
             }
-            "response.completed" => {
+            "response.completed" | "response.incomplete" => {
+                let interrupted = frame.kind == "response.incomplete";
+                if interrupted {
+                    let reason = frame
+                        .response
+                        .as_ref()
+                        .and_then(|response| response.pointer("/incomplete_details/reason"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("unknown");
+                    if reason != "interrupted" {
+                        let message = frame
+                            .response
+                            .as_ref()
+                            .and_then(|response| response.pointer("/error/message"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                            .unwrap_or_else(|| {
+                                format!("Incomplete response returned, reason: {reason}")
+                            });
+                        return fail_with_events(checkpoint, events, message);
+                    }
+                }
                 completed = true;
                 if let Some(response) = frame.response {
-                    checkpoint.response_id = response
-                        .get("id")
-                        .and_then(Value::as_str)
-                        .map(str::to_string);
+                    if let Some(id) = response.get("id").and_then(Value::as_str) {
+                        checkpoint.response_id = Some(id.to_string());
+                    }
                     end_turn = response.get("end_turn").and_then(Value::as_bool);
                 }
+                if interrupted {
+                    end_turn = Some(false);
+                }
             }
-            "response.failed" | "response.incomplete" => {
-                let message = frame
-                    .response
-                    .as_ref()
-                    .and_then(|value| value.pointer("/error/message"))
+            "error" | "response.failed" => {
+                let error = frame.error.as_ref().or_else(|| {
+                    frame
+                        .response
+                        .as_ref()
+                        .and_then(|response| response.get("error"))
+                });
+                let message = error
+                    .and_then(|error| error.get("message"))
                     .and_then(Value::as_str)
+                    .filter(|message| !message.trim().is_empty())
+                    .or_else(|| {
+                        error
+                            .and_then(|error| error.get("code"))
+                            .and_then(Value::as_str)
+                    })
                     .unwrap_or("model response failed")
                     .to_string();
                 return fail_with_events(checkpoint, events, message);
             }
             _ => {}
         }
+    }
+
+    if !completed {
+        return fail_with_events(
+            checkpoint,
+            events,
+            "model response ended without a terminal event".to_string(),
+        );
     }
 
     if !checkpoint.pending_calls.is_empty() {
@@ -354,7 +410,7 @@ fn resolve_model(mut checkpoint: Checkpoint, frames: Vec<Value>) -> Transition {
         };
     }
 
-    if completed && end_turn.unwrap_or(true) {
+    if end_turn.unwrap_or(true) {
         checkpoint.phase = Phase::Completed;
         let completed_output = checkpoint.final_output.clone();
         let completed_response_id = checkpoint.response_id.clone();
@@ -375,11 +431,16 @@ fn resolve_model(mut checkpoint: Checkpoint, frames: Vec<Value>) -> Transition {
         };
     }
 
-    fail_with_events(
+    // Codex requests another round when the provider sets end_turn=false,
+    // including response.incomplete with reason="interrupted".
+    checkpoint.phase = Phase::WaitingForModel;
+    checkpoint.model_round += 1;
+    let action = model_action(&mut checkpoint, &mut events);
+    Transition {
         checkpoint,
         events,
-        "model response ended without a tool call or terminal answer".to_string(),
-    )
+        action,
+    }
 }
 
 /// Register the tool calls a model response asked for. Message and reasoning
@@ -445,13 +506,19 @@ fn tool_action(checkpoint: &mut Checkpoint, events: &mut Vec<KernelEvent>) -> Op
 
 fn model_action(checkpoint: &mut Checkpoint, events: &mut Vec<KernelEvent>) -> Action {
     let effect_id = model_effect_id(checkpoint.model_round);
-    // `input` is the transcript, which the host assembles from its session
-    // store under its own context budget when it performs the effect.
+    // Codex 0.165.0 carries base instructions as a developer message in
+    // `input`. The host appends the transcript from its Sessions store.
     let request = json!({
         "type": "response.create",
         "model": checkpoint.model,
-        "instructions": "You are Codex. Inspect and modify the workspace using the supplied tools. Finish with a concise account of the result.",
-        "input": null,
+        "input": [{
+            "type": "message",
+            "role": "developer",
+            "content": [{
+                "type": "input_text",
+                "text": "You are Codex. Inspect and modify the workspace using the supplied tools. Finish with a concise account of the result."
+            }]
+        }],
         "tools": workspace_tools(),
         "tool_choice": "auto",
         "parallel_tool_calls": true,
