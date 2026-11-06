@@ -3,6 +3,10 @@
 A Worker-native coding harness that runs a Codex-derived Rust/Wasm turn loop as
 a Lifecycle capability inside a plain Durable Object.
 
+The harness owns and installs its `Tasks`, `Sessions`, and `Streams`
+capabilities. The host supplies the model and Workspace, and installs
+`WebSockets` separately for the browser connection.
+
 The example composes:
 
 - `CodexHarness extends LifecycleCapability` for the durable agent loop;
@@ -35,11 +39,10 @@ const model = createWorkersAI({
 
 readonly codex = new CodexHarness({
   model,
-  tasks: this.tasks,
-  streams: this.streams,
-  sessions: this.sessions,
   workspace: this.workspace
 });
+
+readonly lifecycle = this.codex.install(Lifecycle.install(this));
 ```
 
 The Codex codec maps its Responses records to a V4 prompt and maps V4 stream
@@ -91,6 +94,17 @@ by a marker the model can page back with a ranged read, and Sessions
 compacts the branch once its estimated tokens pass a threshold, using the
 same model to summarise. The budget and the compaction policy are
 `CodexHarness` options.
+
+## Tests
+
+```sh
+pnpm test
+```
+
+This installs the pinned Rust/Wasm toolchain if needed, builds the kernel,
+and runs the harness in the Workers runtime with a synthetic model. The tests
+cover persisted transcripts, file tools, event replay, duplicate submissions,
+and queued and interrupted operations across object resets.
 
 ## Stress test
 

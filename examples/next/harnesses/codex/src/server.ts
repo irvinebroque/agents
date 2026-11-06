@@ -2,9 +2,6 @@ import { Workspace } from "@cloudflare/computer";
 import { DurableObject } from "cloudflare:workers";
 import { routeAgentRequest } from "agents";
 import { Lifecycle } from "agents/lifecycle";
-import { Sessions } from "agents/sessions";
-import { Streams } from "agents/streams";
-import { Tasks } from "agents/tasks";
 import { WebSockets } from "agents/websockets";
 import { createWorkersAI } from "workers-ai-provider";
 import { CodexHarness } from "./codex-harness";
@@ -13,14 +10,8 @@ const MODEL = "@cf/moonshotai/kimi-k2.7-code";
 
 /** Plain Durable Object composed with the Codex Lifecycle capability. */
 export class Coder extends DurableObject<Env> {
-  readonly tasks = new Tasks();
-  readonly streams = new Streams();
-  readonly sessions = new Sessions();
   readonly workspace = new Workspace({ storage: this.ctx.storage });
   readonly codex = new CodexHarness({
-    tasks: this.tasks,
-    streams: this.streams,
-    sessions: this.sessions,
     workspace: this.workspace,
     model: createWorkersAI({
       binding: this.env.AI,
@@ -35,12 +26,9 @@ export class Coder extends DurableObject<Env> {
         setTimeout(() => this.ctx.abort("restart requested from the demo"), 50)
     })
   );
-  readonly lifecycle = Lifecycle.install(this)
-    .use(this.tasks)
-    .use(this.streams)
-    .use(this.sessions)
-    .use(this.webSockets)
-    .use(this.codex);
+  readonly lifecycle = this.codex.install(
+    Lifecycle.install(this).use(this.webSockets)
+  );
 }
 
 export default {

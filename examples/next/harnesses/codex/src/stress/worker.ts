@@ -1,9 +1,6 @@
 import { Workspace } from "@cloudflare/computer";
 import { DurableObject } from "cloudflare:workers";
 import { Lifecycle } from "agents/lifecycle";
-import { Sessions } from "agents/sessions";
-import { Streams } from "agents/streams";
-import { Tasks } from "agents/tasks";
 import { CodexHarness } from "../codex-harness";
 import { StressModel, type StressScenario } from "./model";
 
@@ -41,23 +38,13 @@ export type StressStats = {
 /** The codex composition with a synthetic model, driven over RPC. */
 export class StressCoder extends DurableObject<StressEnv> {
   private readonly model = new StressModel();
-  private readonly tasks = new Tasks();
-  private readonly streams = new Streams();
-  private readonly sessions = new Sessions();
   private readonly workspace = new Workspace({ storage: this.ctx.storage });
   private readonly codex = new CodexHarness({
-    tasks: this.tasks,
-    streams: this.streams,
-    sessions: this.sessions,
     workspace: this.workspace,
     model: this.model,
     compaction: false
   });
-  private readonly lifecycle = Lifecycle.install(this)
-    .use(this.tasks)
-    .use(this.streams)
-    .use(this.sessions)
-    .use(this.codex);
+  private readonly lifecycle = this.codex.install(Lifecycle.install(this));
 
   /** Run one operation to settlement under the given scenario. */
   async run(scenario: StressScenario, promptBytes = 64): Promise<StressRun> {

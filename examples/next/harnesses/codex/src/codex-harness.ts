@@ -1,12 +1,12 @@
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { Workspace } from "@cloudflare/computer";
 import { generateText } from "ai";
-import { LifecycleCapability } from "agents/lifecycle";
+import { LifecycleCapability, type Lifecycle } from "agents/lifecycle";
 import {
   createCompactFunction,
   type Session,
   type SessionMessage,
-  type Sessions
+  Sessions
 } from "agents/sessions";
 import { Streams, type StreamWriter } from "agents/streams";
 import { Tasks, type TaskStep } from "agents/tasks";
@@ -103,14 +103,8 @@ type OperationRow = {
 
 type DriverInput = { operationId: string };
 
-/** Dependencies the host composes around a Codex harness. */
+/** Model and workspace supplied by the host. */
 export type CodexHarnessOptions = {
-  /** Durable wake and attempt journal capability. */
-  readonly tasks: Tasks;
-  /** Durable operation event stream capability. */
-  readonly streams: Streams;
-  /** Durable transcript: every prompt, assistant message, and tool output. */
-  readonly sessions: Sessions;
   /** Durable filesystem the Codex tools operate on. */
   readonly workspace: CodexWorkspace;
   /** AI SDK LanguageModelV4 used for every Codex round and for compaction. */
@@ -135,8 +129,9 @@ export type CodexHarnessOptions = {
  * Tasks steps, and files in the Workspace. Nothing here truncates.
  */
 export class CodexHarness extends LifecycleCapability {
-  private readonly tasks: Tasks;
-  private readonly streams: Streams;
+  private readonly tasks = new Tasks();
+  private readonly streams = new Streams();
+  private readonly sessions = new Sessions();
   private readonly workspace: CodexWorkspace;
   private readonly kernel: KernelRuntime;
   private readonly model: LanguageModelV4;
@@ -162,14 +157,12 @@ export class CodexHarness extends LifecycleCapability {
 
   constructor(options: CodexHarnessOptions) {
     super("codex-harness");
-    this.tasks = options.tasks;
-    this.streams = options.streams;
     this.workspace = options.workspace;
     this.kernel = new DirectKernelRuntime(codexKernelModule);
     this.model = options.model;
     this.maxRounds = options.maxRounds ?? 128;
     this.promptBytes = options.promptBytes ?? DEFAULT_PROMPT_BYTES;
-    this.session = options.sessions.session();
+    this.session = this.sessions.session();
     if (options.compaction !== false) {
       const policy = options.compaction ?? {};
       this.session
@@ -183,9 +176,22 @@ export class CodexHarness extends LifecycleCapability {
         )
         .compactAfter(policy.afterTokens ?? DEFAULT_COMPACT_AFTER_TOKENS);
     }
-    options.tasks.register(DRIVER_DEFINITION, (input, step) =>
+    this.tasks.register(DRIVER_DEFINITION, (input, step) =>
       this.#drive(parseDriverInput(input), step)
     );
+  }
+
+  /** Install the harness and its private durable capabilities before startup. */
+  install<Env extends object, Props extends object>(
+    lifecycle: Lifecycle<Env, Props>
+  ): Lifecycle<Env, Props> {
+    // Keep the existing capability IDs and registration order so stored task
+    // wakes, stream events, and transcripts survive this composition change.
+    return lifecycle
+      .use(this.tasks)
+      .use(this.streams)
+      .use(this.sessions)
+      .use(this);
   }
 
   /** Create the operation table owned by this capability. */
